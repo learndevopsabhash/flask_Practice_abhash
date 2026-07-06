@@ -26,6 +26,7 @@ SECRET_KEY=$SECRET_KEY
 EOF
 
                     python3 --version
+                    cat .env
 
                     echo "Contents of workspace:"
                     ls -la
