@@ -53,6 +53,11 @@ EOF
                 sh '''
                     echo "===== Deploy Stage ====="
 
+                    pwd
+                    pkill -f "python3 app.py" || true
+                    BUILD_ID=dontKillMe nohup python3 app.py > app.log 2>&1 < /dev/null &
+                    
+
                     # Remove old deployment folder if it exists
                     rm -rf deployment
 
@@ -69,6 +74,8 @@ EOF
 
                     echo "===== Deployment Files ====="
                     ls -R deployment
+                    cd deployment
+                    sleep 300
                 '''
             }
         }
