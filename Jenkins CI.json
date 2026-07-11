@@ -1,0 +1,14 @@
+[
+  {
+    "sid": "/a-go-to-setting-tab---nodes---new-node",
+    "title": "a. Go to Setting tab -> Nodes -> New Node",
+    "level": 1,
+    "children": []
+  },
+  {
+    "sid": "/b-fill-details",
+    "title": "b. Fill Details:",
+    "level": 1,
+    "children": []
+  }
+]
