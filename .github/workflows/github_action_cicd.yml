@@ -1,0 +1,96 @@
+name: GitHub Actions CI/CD Pipeline Flask App
+on:
+  push:
+    branches:
+      - staging
+jobs:
+  install-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Create virtual environment and install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+      - name: Create .env file
+        run: |
+          echo "MONGO_URI=${{ secrets.MONGO_URI }}" >> .env
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+          ls -la
+          cd .venv
+          ls -la
+      - name: Upload Python environment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-env
+          path: .venv
+          include-hidden-files: true
+
+  run-tests:
+    needs: install-dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download Python environment artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: python-env
+          path: .venv
+          include-hidden-files: true
+
+      - name: Set permissions for virtual environment
+        run: |  
+          chmod -R 777 .venv
+      - name: Create .env file
+        run: |
+          echo "MONGO_URI=${{ secrets.MONGO_URI }}" >> .env
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+      - name: Run unit tests
+        run: |
+          source .venv/bin/activate
+          pytest -v --collect-only
+      - name: Upload Python environment for deploy
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-env-for-deploy
+          path: .venv
+          include-hidden-files: true
+
+  deploy-to-staging:
+    needs: run-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download Python environment artifact from tests
+        uses: actions/download-artifact@v4
+        with:
+          name: python-env-for-deploy
+          path: .venv
+          include-hidden-files: true
+
+      - name: Set permissions for virtual environment
+        run: |  
+          chmod -R 777 .venv
+      - name: Create .env file
+        run: |
+          echo "MONGO_URI=${{ secrets.MONGO_URI }}" >> .env
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+      - name: Deploy to Staging Server
+        run: |
+          source .venv/bin/activate
+          nohup python app.py &
+          sleep 5
+          curl -fsS http://localhost:5000
