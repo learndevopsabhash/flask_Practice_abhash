@@ -1,91 +1,80 @@
 pipeline {
-    agent any
-
+    agent {
+        label 'Abhash_EC2'
+        }
     environment {
                 MONGO_URI = credentials('abhash-mongo-uri')
                 SECRET_KEY = credentials('abhash-mongo-secret-key')
             }
-
-    stages {
-
-        stage('Checkout') {
+     stages {
+        stage('checkout') {
             steps {
-                checkout scm
+                git url: 'https://github.com/learndevopsabhash/flask_Practice_abhash.git',
+                branch: 'main'   
+                }
             }
-        }
-
-        stage('Build') {
+        stage('install dependencies') {
             steps {
                 sh '''
-                    echo "===== Build Stage ====="
-                    echo "Creating .env file..."
-
-                cat > .env <<EOF
-MONGO_URI=$MONGO_URI
-SECRET_KEY=$SECRET_KEY
-EOF
-
-                    python3 --version
-                    cat .env
-
-                    echo "Contents of workspace:"
-                    ls -la
-
-                    python3 -m pip install --upgrade pip --break-system-packages
-
-                    python3 -m pip install -r requirements.txt --break-system-packages
+                sudo apt-get update
+                sudo apt-get install -y python3-venv python3-pip
+                python3 -m venv venv
+                . venv/bin/activate
+                pip3 install -r requirements.txt
+                printf "MONGO_URI=$MONGO_URI\nSECRET_KEY=$SECRET_KEY" > .env
+                '''
+            }       
+        }
+        stage('test') {
+            steps {
+                sh '''
+                . venv/bin/activate
+                pytest test_app.py
                 '''
             }
         }
-
-        stage('Test') {
+        stage('create systemd service for python-flask-app') {
             steps {
                 sh '''
-                    echo "===== Test Stage ====="
+                cat > python.service <<EOF
+                [Unit]
+                Description=Python Application Service
+                
+                [Service]
+                User=ubuntu
+                WorkingDirectory=/python-app
+                EnvironmentFile=/python-app/.env
+                ExecStart=/python-app/venv/bin/python3 /python-app/app.py
+                Restart=always
+                RestartSec=5
 
-                    python3 -m pytest -v
-                '''
+                [Install]
+                WantedBy=multi-user.target
+                EOF
+                '''            
             }
         }
-
-        stage('Deploy') {
+        stage('deploy') {
             steps {
                 sh '''
-                    echo "===== Deploy Stage ====="
-
-                    pwd
-                    pkill -f "python3 app.py" || true
-                    BUILD_ID=dontKillMe nohup python3 app.py > app.log 2>&1 < /dev/null &
-                    
-
-                    # Remove old deployment folder if it exists
-                    rm -rf deployment
-
-                    # Create deployment directory
-                    mkdir deployment
-
-                    # Copy only required application files
-                    cp app.py deployment/
-                    cp requirements.txt deployment/
-                    cp README.md deployment/
-                    cp -r templates deployment/
-
-                    echo "Deployment completed successfully."
-
-                    echo "===== Deployment Files ====="
-                    ls -R deployment
-                    cd deployment
-                    sleep 300
+                sudo mv python.service /etc/systemd/system/python.service
+                sudo ls -l /etc/systemd/system/python.service
+                sudo mkdir -p /python-app
+                sudo rsync -a --delete $WORKSPACE/ /python-app/
+                sudo systemctl daemon-reload
+                sudo systemctl enable python
+                sudo systemctl restart python
+                sudo systemctl status python --no-pager
+                sleep 5
+                ps -ef | grep app.py | grep -v grep
                 '''
             }
-        }
+        } 
     }
-
-     post {
-
+    post {
         success {
             emailext(
-                to: 'imabhash@gmail.com',
+                to: 'abhashjain@yahoo.com',
                 subject: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
     Hello,
@@ -96,7 +85,7 @@ EOF
     Build Number : ${env.BUILD_NUMBER}
     Status       : SUCCESS
     
-    The Flask application was:
+    The Python application was:
     ✔ Checked out
     ✔ Built
     ✔ Tested
@@ -111,10 +100,9 @@ EOF
     """
             )
         }
-    
         failure {
             emailext(
-                to: 'imabhash@gmail.com',
+                to: 'abhashjain@yahoo.com',
                 subject: "❌ FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
     Hello,
@@ -130,7 +118,7 @@ EOF
     Build URL:
     ${env.BUILD_URL}
     
-    Regards,
+    Warm Regards,
     Jenkins CI/CD
     """
             )
