@@ -1,18 +1,18 @@
 pipeline {
     agent {
         label 'Abhash_EC2'
-        }
+          }
     environment {
                 MONGO_URI = credentials('abhash-mongo-uri')
                 SECRET_KEY = credentials('abhash-mongo-secret-key')
-            }
+                }
      stages {
         stage('checkout') {
             steps {
                 git url: 'https://github.com/learndevopsabhash/flask_Practice_abhash.git',
                 branch: 'main'   
-                }
-            }
+                  }
+                          }
         stage('install dependencies') {
             steps {
                 sh '''
@@ -23,7 +23,7 @@ pipeline {
                 pip3 install -r requirements.txt
                 printf "MONGO_URI=$MONGO_URI\nSECRET_KEY=$SECRET_KEY" > .env
                 '''
-            }       
+                  }       
         }
         stage('test') {
             steps {
@@ -54,7 +54,6 @@ pipeline {
                 '''            
             }
         }
-        
         stage('deploy') {
             steps {
                 sh '''
