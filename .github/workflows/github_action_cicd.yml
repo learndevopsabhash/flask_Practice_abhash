@@ -79,13 +79,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: SSH into Production Server and Deploy
-        uses: appleboy/ssh-action@v0.1.6
+      - name: setup ssh agent
+        uses: webfactory/ssh-agent@v0.5.3
         with:
-          host: ${{ secrets.PROD_SERVER_IP }}
-          username: ${{ secrets.PROD_SERVER_USER }}
-          key: ${{ secrets.PROD_SERVER_SSH_KEY }}
-          script: |
+          ssh-private-key: ${{ secrets.PROD_SERVER_SSH_KEY }}
+      
+      - name: deploy to my ec2 and run the flask app
+        run: |
+          ssh -o "strictHostKeyChecking=no" ${{ secrets.PROD_SERVER_USER }}@${{ secrets.PROD_SERVER_IP }} \
+          "
             mkdir -p /app
             cd /app
             git pull origin main
@@ -97,3 +99,4 @@ jobs:
             nohup python app.py &
             sleep 60
             curl -fsS http://localhost:5000
+          "
