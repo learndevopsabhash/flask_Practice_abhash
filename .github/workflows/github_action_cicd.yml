@@ -71,6 +71,35 @@ jobs:
           sleep 5
           curl -fsS http://localhost:5000
 
+  deploy-to-staging:
+    if: github.ref == 'refs/heads/staging'
+    needs: install-dependencies-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Download .venv
+          path: .venv
+          include-hidden-files: true
+
+      - name: Set permissions for virtual environment
+        run: |  
+          chmod -R +x .venv
+      - name: Create .env file
+        run: |
+          echo "MONGO_URI=${{ secrets.MONGO_URI }}" >> .env
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+      - name: Deploy to Staging Server
+        run: |
+          source .venv/bin/activate
+          nohup python app.py &
+          sleep 5
+          curl -fsS http://localhost:5000
+
   deploy-to-production:
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
     needs: install-dependencies-and-test
@@ -81,28 +110,21 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.PROD_SERVER_SSH_KEY }}
       
-      - name: deploy to my ec2 and run the flask app
+      - name: Deploy to EC2
         run: |
-          ssh -o "strictHostKeyChecking=no" ${{ secrets.PROD_SERVER_USER }}@${{ secrets.PROD_SERVER_IP }} << 'EOF'
+           ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_SERVER_USER }}@${{ secrets.PROD_SERVER_IP }} << EOF
+            cd /home/ubuntu
             if [ ! -d flask_Practice_abhash ]; then
-              git clone https://github.com/learndevopsabhash/flask_Practice_abhash.git
+                git clone https://github.com/learndevopsabhash/flask_Practice_abhash.git
             fi
             cd flask_Practice_abhash
             git pull origin main
-            cat > .env << EOF
-            MONGO_URI=${{ secrets.MONGO_URI }}
-            SECRET_KEY=${{ secrets.SECRET_KEY }}
-            EOF
-            docker stop flask-container || true
-            docker rm flask-container || true
-            docker build -t flask-app:v1 .
-            docker images
-            docker run -d \
-              --name flask-container \
-              --env-file .env \
-              -p 5000:5000 \
-              flask-app:v1
-            curl -fsS http://localhost:5000
-            docker ps
-            EOF
-          "
+            echo "MONGO_URI=${{ secrets.MONGO_URI }}" > .env
+            echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+            sudo docker stop flask-app || true
+            sudo docker rm flask-app || true
+            sudo docker build -t flask-app .
+            sudo docker run -d --name flask-app --restart always -p 5000:5000 --env-file .env flask-app
+
+            
+           EOF
