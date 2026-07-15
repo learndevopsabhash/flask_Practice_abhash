@@ -1,3 +1,7 @@
+# Check README_Jenkins.MD for Jenkins CICD
+
+# Check GitHub_Action_CICD.docx for GitHub CICD Action
+
 # Student Registration System
 
 A simple **Flask** web application to manage student records with **MongoDB** as the backend database. Users can **add, view, update, and delete** student details.
